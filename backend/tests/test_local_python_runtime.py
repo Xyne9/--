@@ -64,3 +64,20 @@ def test_local_python_runtime_reports_failure_exit_code(tmp_path):
 
     assert result.status == "failed"
     assert result.exit_code == 7
+
+
+def test_local_python_runtime_reports_timeout(tmp_path):
+    runtime = LocalPythonRuntime()
+    request = ExecutionRequest(
+        run_id="run_timeout",
+        step_id="step_timeout",
+        code="import time\ntime.sleep(2)",
+        workspace_root=tmp_path,
+        timeout_seconds=0.1,
+    )
+
+    result = runtime.execute(request)
+
+    assert result.status == "timeout"
+    assert result.exit_code is None
+    assert result.duration_seconds < 2.0
