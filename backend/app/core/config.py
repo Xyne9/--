@@ -11,6 +11,10 @@ class AppSettings:
     duckdb_path: Path
     uploads_dir: Path
     runs_dir: Path
+    llm_provider: str
+    llm_base_url: str
+    llm_api_key: str | None
+    llm_model: str
 
 
 def build_settings(workspace_root: str | None = None) -> AppSettings:
@@ -21,6 +25,10 @@ def build_settings(workspace_root: str | None = None) -> AppSettings:
         duckdb_path=root / "analytics.duckdb",
         uploads_dir=root / "uploads",
         runs_dir=root / "runs",
+        llm_provider=os.getenv("LLM_PROVIDER", "openai-compatible"),
+        llm_base_url=os.getenv("LLM_BASE_URL", "https://api.openai.com/v1").rstrip("/"),
+        llm_api_key=os.getenv("LLM_API_KEY") or os.getenv("OPENAI_API_KEY"),
+        llm_model=os.getenv("LLM_MODEL", "gpt-4.1-mini"),
     )
 
 

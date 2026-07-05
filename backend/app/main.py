@@ -2,6 +2,7 @@ from fastapi import FastAPI
 
 from app.api.artifacts import router as artifacts_router
 from app.api.datasets import router as datasets_router
+from app.api.llm import router as llm_router
 from app.api.projects import router as projects_router
 from app.api.runs import router as runs_router
 
@@ -11,6 +12,7 @@ app.include_router(projects_router)
 app.include_router(datasets_router)
 app.include_router(runs_router)
 app.include_router(artifacts_router)
+app.include_router(llm_router)
 
 
 @app.get("/health")
