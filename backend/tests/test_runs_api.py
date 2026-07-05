@@ -142,3 +142,28 @@ def test_create_run_api_rejects_missing_dataset(db_session):
         app.dependency_overrides.clear()
 
     assert response.status_code == 404
+
+
+def test_run_events_api_returns_created_and_step_events(db_session, tmp_path):
+    project, dataset = create_sample_dataset(db_session, tmp_path)
+    app.dependency_overrides[get_session] = lambda: db_session
+    client = TestClient(app)
+
+    try:
+        created = client.post(
+            "/api/runs",
+            json={
+                "project_id": project.id,
+                "dataset_id": dataset.id,
+                "user_goal": "Find churn drivers",
+            },
+        ).json()
+        response = client.get(f"/api/runs/{created['id']}/events")
+    finally:
+        app.dependency_overrides.clear()
+        get_settings.cache_clear()
+
+    assert response.status_code == 200
+    assert response.json()["events"][0]["type"] == "run.created"
+    assert response.json()["events"][1]["type"] == "plan.generated"
+    assert response.json()["events"][2]["type"] == "step.created"

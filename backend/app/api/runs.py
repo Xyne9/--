@@ -1,3 +1,5 @@
+from typing import Any
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel
 from sqlmodel import Session
@@ -107,3 +109,31 @@ def get_run_endpoint(
     session: Session = Depends(get_session),
 ) -> RunResponse:
     return to_run_response(session, run_id)
+
+
+@router.get("/{run_id}/events")
+def get_run_events_endpoint(
+    run_id: str,
+    session: Session = Depends(get_session),
+) -> dict[str, list[dict[str, Any]]]:
+    run = get_run(session, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    steps = list_run_steps(session, run.id)
+    events: list[dict[str, Any]] = [
+        {"type": "run.created", "run_id": run.id, "status": run.status},
+        {"type": "plan.generated", "run_id": run.id, "step_count": len(steps)},
+    ]
+    for step in steps:
+        events.append(
+            {
+                "type": "step.created",
+                "run_id": run.id,
+                "step_id": step.id,
+                "sequence": step.sequence,
+                "title": step.title,
+                "kind": step.kind,
+                "status": step.status,
+            }
+        )
+    return {"events": events}
