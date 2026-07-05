@@ -64,5 +64,11 @@ class ExecutionStep(SQLModel, table=True):
     title: str
     kind: str
     status: str
+    exit_code: int | None = None
+    stdout: str = ""
+    stderr: str = ""
+    workdir: str | None = None
+    artifacts_dir: str | None = None
+    duration_seconds: float | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)

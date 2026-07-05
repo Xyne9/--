@@ -4,8 +4,9 @@ from typing import Any
 from sqlmodel import Session, select
 
 from app.core.config import AppSettings
+from app.execution.runtime import ExecutionResult
 from app.storage.duckdb import preview_table
-from app.storage.models import AnalysisRun, ColumnProfile, Dataset, ExecutionStep, Project
+from app.storage.models import AnalysisRun, ColumnProfile, Dataset, ExecutionStep, Project, utc_now
 
 
 def create_project(session: Session, name: str) -> Project:
@@ -158,6 +159,29 @@ def get_run(session: Session, run_id: str) -> AnalysisRun | None:
     return session.get(AnalysisRun, run_id)
 
 
+def get_execution_step(session: Session, step_id: str) -> ExecutionStep | None:
+    return session.get(ExecutionStep, step_id)
+
+
 def list_run_steps(session: Session, run_id: str) -> list[ExecutionStep]:
     statement = select(ExecutionStep).where(ExecutionStep.run_id == run_id).order_by(ExecutionStep.sequence)
     return list(session.exec(statement).all())
+
+
+def record_step_execution_result(
+    session: Session,
+    step: ExecutionStep,
+    result: ExecutionResult,
+) -> ExecutionStep:
+    step.status = result.status
+    step.exit_code = result.exit_code
+    step.stdout = result.stdout
+    step.stderr = result.stderr
+    step.workdir = str(result.workdir)
+    step.artifacts_dir = str(result.artifacts_dir)
+    step.duration_seconds = result.duration_seconds
+    step.updated_at = utc_now()
+    session.add(step)
+    session.commit()
+    session.refresh(step)
+    return step
