@@ -6,7 +6,9 @@ from sqlmodel import Session
 
 from app.agents.orchestrator import RunOrchestrator
 from app.agents.planner import generate_initial_plan
+from app.api.artifacts import ArtifactResponse, to_artifact_response
 from app.api.deps import get_session
+from app.artifacts.registry import index_step_artifacts, list_run_artifacts
 from app.core.config import AppSettings, ensure_workspace, get_settings
 from app.datasets.registry import (
     create_analysis_run,
@@ -55,6 +57,10 @@ class RunResponse(BaseModel):
     user_goal: str
     status: str
     steps: list[StepResponse]
+
+
+class RunArtifactsResponse(BaseModel):
+    artifacts: list[ArtifactResponse]
 
 
 class ExecuteStepRequest(BaseModel):
@@ -175,6 +181,19 @@ def get_run_endpoint(
     return to_run_response(session, run_id)
 
 
+@router.get("/{run_id}/artifacts", response_model=RunArtifactsResponse)
+def list_run_artifacts_endpoint(
+    run_id: str,
+    session: Session = Depends(get_session),
+) -> RunArtifactsResponse:
+    run = get_run(session, run_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Run not found")
+    return RunArtifactsResponse(
+        artifacts=[to_artifact_response(artifact) for artifact in list_run_artifacts(session, run.id)]
+    )
+
+
 @router.post("/{run_id}/execute", response_model=ExecuteRunResponse)
 def execute_run_endpoint(
     run_id: str,
@@ -228,6 +247,13 @@ def execute_step_endpoint(
         )
     )
     recorded_step = record_step_execution_result(session, step, result, code=request.code)
+    index_step_artifacts(
+        session,
+        run_id=run.id,
+        step_id=recorded_step.id,
+        artifacts_dir=result.artifacts_dir,
+        workspace_root=workspace_settings.workspace_root,
+    )
     return to_execute_step_response(run_id=run.id, step=recorded_step)
 
 

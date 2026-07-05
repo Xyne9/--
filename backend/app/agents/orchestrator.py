@@ -3,6 +3,7 @@ from textwrap import dedent
 
 from sqlmodel import Session
 
+from app.artifacts.registry import index_step_artifacts
 from app.core.config import AppSettings, ensure_workspace
 from app.datasets.registry import (
     get_dataset,
@@ -62,6 +63,13 @@ class RunOrchestrator:
                 )
             )
             recorded_step = record_step_execution_result(session, step, result, code=code)
+            index_step_artifacts(
+                session,
+                run_id=run.id,
+                step_id=recorded_step.id,
+                artifacts_dir=result.artifacts_dir,
+                workspace_root=workspace_settings.workspace_root,
+            )
             executed_steps.append(recorded_step)
             if result.status != "completed":
                 final_status = "FAILED"

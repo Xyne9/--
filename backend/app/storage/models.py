@@ -73,3 +73,15 @@ class ExecutionStep(SQLModel, table=True):
     duration_seconds: float | None = None
     created_at: datetime = Field(default_factory=utc_now)
     updated_at: datetime = Field(default_factory=utc_now)
+
+
+class Artifact(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: new_id("artifact"), primary_key=True)
+    run_id: str = Field(foreign_key="analysisrun.id", index=True)
+    step_id: str = Field(foreign_key="executionstep.id", index=True)
+    name: str
+    artifact_type: str
+    mime_type: str
+    uri: str
+    size_bytes: int
+    created_at: datetime = Field(default_factory=utc_now)
