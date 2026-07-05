@@ -64,6 +64,7 @@ class ExecutionStep(SQLModel, table=True):
     title: str
     kind: str
     status: str
+    code: str = ""
     exit_code: int | None = None
     stdout: str = ""
     stderr: str = ""

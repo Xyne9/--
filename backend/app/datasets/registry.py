@@ -159,6 +159,15 @@ def get_run(session: Session, run_id: str) -> AnalysisRun | None:
     return session.get(AnalysisRun, run_id)
 
 
+def update_run_status(session: Session, run: AnalysisRun, status: str) -> AnalysisRun:
+    run.status = status
+    run.updated_at = utc_now()
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    return run
+
+
 def get_execution_step(session: Session, step_id: str) -> ExecutionStep | None:
     return session.get(ExecutionStep, step_id)
 
@@ -172,7 +181,10 @@ def record_step_execution_result(
     session: Session,
     step: ExecutionStep,
     result: ExecutionResult,
+    code: str | None = None,
 ) -> ExecutionStep:
+    if code is not None:
+        step.code = code
     step.status = result.status
     step.exit_code = result.exit_code
     step.stdout = result.stdout

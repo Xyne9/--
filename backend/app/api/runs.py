@@ -4,6 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlmodel import Session
 
+from app.agents.orchestrator import RunOrchestrator
 from app.agents.planner import generate_initial_plan
 from app.api.deps import get_session
 from app.core.config import AppSettings, ensure_workspace, get_settings
@@ -20,6 +21,7 @@ from app.datasets.registry import (
 )
 from app.execution.local_python import LocalPythonRuntime
 from app.execution.runtime import ExecutionRequest
+from app.storage.models import ExecutionStep
 
 
 router = APIRouter(prefix="/api/runs", tags=["runs"])
@@ -37,6 +39,7 @@ class StepResponse(BaseModel):
     title: str
     kind: str
     status: str
+    code: str
     exit_code: int | None
     stdout: str
     stderr: str
@@ -63,12 +66,38 @@ class ExecuteStepResponse(BaseModel):
     run_id: str
     step_id: str
     status: str
+    code: str
     exit_code: int | None
     stdout: str
     stderr: str
     workdir: str
     artifacts_dir: str
     duration_seconds: float
+
+
+class ExecuteRunRequest(BaseModel):
+    timeout_seconds: float = Field(default=30.0, gt=0)
+
+
+class ExecuteRunResponse(BaseModel):
+    run_id: str
+    status: str
+    steps: list[ExecuteStepResponse]
+
+
+def to_execute_step_response(run_id: str, step: ExecutionStep) -> ExecuteStepResponse:
+    return ExecuteStepResponse(
+        run_id=run_id,
+        step_id=step.id,
+        status=step.status,
+        code=step.code,
+        exit_code=step.exit_code,
+        stdout=step.stdout,
+        stderr=step.stderr,
+        workdir=step.workdir or "",
+        artifacts_dir=step.artifacts_dir or "",
+        duration_seconds=step.duration_seconds or 0.0,
+    )
 
 
 def to_run_response(session: Session, run_id: str) -> RunResponse:
@@ -89,6 +118,7 @@ def to_run_response(session: Session, run_id: str) -> RunResponse:
                 title=step.title,
                 kind=step.kind,
                 status=step.status,
+                code=step.code,
                 exit_code=step.exit_code,
                 stdout=step.stdout,
                 stderr=step.stderr,
@@ -145,6 +175,33 @@ def get_run_endpoint(
     return to_run_response(session, run_id)
 
 
+@router.post("/{run_id}/execute", response_model=ExecuteRunResponse)
+def execute_run_endpoint(
+    run_id: str,
+    request: ExecuteRunRequest,
+    session: Session = Depends(get_session),
+    settings: AppSettings = Depends(get_settings),
+) -> ExecuteRunResponse:
+    try:
+        result = RunOrchestrator().execute_run(
+            session=session,
+            settings=settings,
+            run_id=run_id,
+            timeout_seconds=request.timeout_seconds,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
+
+    return ExecuteRunResponse(
+        run_id=result.run.id,
+        status=result.run.status,
+        steps=[
+            to_execute_step_response(run_id=result.run.id, step=step)
+            for step in result.steps
+        ],
+    )
+
+
 @router.post("/{run_id}/steps/{step_id}/execute", response_model=ExecuteStepResponse)
 def execute_step_endpoint(
     run_id: str,
@@ -170,18 +227,8 @@ def execute_step_endpoint(
             timeout_seconds=request.timeout_seconds,
         )
     )
-    recorded_step = record_step_execution_result(session, step, result)
-    return ExecuteStepResponse(
-        run_id=run.id,
-        step_id=recorded_step.id,
-        status=recorded_step.status,
-        exit_code=recorded_step.exit_code,
-        stdout=recorded_step.stdout,
-        stderr=recorded_step.stderr,
-        workdir=recorded_step.workdir or "",
-        artifacts_dir=recorded_step.artifacts_dir or "",
-        duration_seconds=recorded_step.duration_seconds or 0.0,
-    )
+    recorded_step = record_step_execution_result(session, step, result, code=request.code)
+    return to_execute_step_response(run_id=run.id, step=recorded_step)
 
 
 @router.get("/{run_id}/events")
@@ -219,4 +266,8 @@ def get_run_events_endpoint(
                     "exit_code": step.exit_code,
                 }
             )
+    if run.status == "COMPLETED":
+        events.append({"type": "run.completed", "run_id": run.id, "status": run.status})
+    if run.status == "FAILED":
+        events.append({"type": "run.failed", "run_id": run.id, "status": run.status})
     return {"events": events}

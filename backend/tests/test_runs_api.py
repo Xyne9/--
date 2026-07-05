@@ -193,6 +193,7 @@ def test_execute_step_api_runs_code_and_persists_result(db_session, tmp_path):
     assert body["run_id"] == created["id"]
     assert body["step_id"] == step_id
     assert body["status"] == "completed"
+    assert body["code"] == "print('hello step')"
     assert body["exit_code"] == 0
     assert body["stdout"].strip() == "hello step"
     assert body["stderr"] == ""
@@ -204,6 +205,7 @@ def test_execute_step_api_runs_code_and_persists_result(db_session, tmp_path):
 
     persisted_step = loaded["steps"][0]
     assert persisted_step["status"] == "completed"
+    assert persisted_step["code"] == "print('hello step')"
     assert persisted_step["exit_code"] == 0
     assert persisted_step["stdout"].strip() == "hello step"
     assert persisted_step["stderr"] == ""
