@@ -5,7 +5,7 @@ from sqlmodel import Session, select
 
 from app.core.config import AppSettings
 from app.storage.duckdb import preview_table
-from app.storage.models import ColumnProfile, Dataset, Project
+from app.storage.models import AnalysisRun, ColumnProfile, Dataset, ExecutionStep, Project
 
 
 def create_project(session: Session, name: str) -> Project:
@@ -110,3 +110,54 @@ def get_dataset_profile(session: Session, dataset_id: str) -> dict[str, Any]:
 
 def preview_dataset(settings: AppSettings, table_name: str, limit: int = 20) -> dict[str, Any]:
     return preview_table(settings.duckdb_path, table_name, limit)
+
+
+def create_analysis_run(
+    session: Session,
+    *,
+    project_id: str,
+    dataset_id: str,
+    user_goal: str,
+    status: str,
+) -> AnalysisRun:
+    run = AnalysisRun(
+        project_id=project_id,
+        dataset_id=dataset_id,
+        user_goal=user_goal,
+        status=status,
+    )
+    session.add(run)
+    session.commit()
+    session.refresh(run)
+    return run
+
+
+def create_execution_step(
+    session: Session,
+    *,
+    run_id: str,
+    sequence: int,
+    title: str,
+    kind: str,
+    status: str,
+) -> ExecutionStep:
+    step = ExecutionStep(
+        run_id=run_id,
+        sequence=sequence,
+        title=title,
+        kind=kind,
+        status=status,
+    )
+    session.add(step)
+    session.commit()
+    session.refresh(step)
+    return step
+
+
+def get_run(session: Session, run_id: str) -> AnalysisRun | None:
+    return session.get(AnalysisRun, run_id)
+
+
+def list_run_steps(session: Session, run_id: str) -> list[ExecutionStep]:
+    statement = select(ExecutionStep).where(ExecutionStep.run_id == run_id).order_by(ExecutionStep.sequence)
+    return list(session.exec(statement).all())

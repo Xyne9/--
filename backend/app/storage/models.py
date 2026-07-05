@@ -45,3 +45,24 @@ class ColumnProfile(SQLModel, table=True):
     sample_values_json: str
     semantic_role: str
     pii_risk: str
+
+
+class AnalysisRun(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: new_id("run"), primary_key=True)
+    project_id: str = Field(foreign_key="project.id", index=True)
+    dataset_id: str = Field(foreign_key="dataset.id", index=True)
+    user_goal: str
+    status: str
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
+
+
+class ExecutionStep(SQLModel, table=True):
+    id: str = Field(default_factory=lambda: new_id("step"), primary_key=True)
+    run_id: str = Field(foreign_key="analysisrun.id", index=True)
+    sequence: int
+    title: str
+    kind: str
+    status: str
+    created_at: datetime = Field(default_factory=utc_now)
+    updated_at: datetime = Field(default_factory=utc_now)
